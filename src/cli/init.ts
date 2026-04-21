@@ -423,28 +423,6 @@ const envMap = {
 };
 fs.writeFileSync(ENV_PATH, buildEnv(envMap));
 
-// ─── Write rover.config.ts ────────────────────────────────────────────────────
-const roverConfig = {
-  swarmUrl: "https://swarm.vav.sh",
-  scoutKey: "sc_vav_xxx",
-  dryRun: true,
-  preset: presetChoice.key === "safe" ? "conservative" : presetChoice.key,
-};
-
-const roverConfigTs = `export type RoverPreset = "conservative" | "moderate" | "aggressive";
-
-export type RoverConfig = {
-  swarmUrl: string;
-  scoutKey: string;
-  dryRun: boolean;
-  preset: RoverPreset;
-};
-
-export const roverConfig: RoverConfig = ${JSON.stringify(roverConfig, null, 2)};
-`;
-
-fs.writeFileSync(CONFIG_PATH, roverConfigTs);
-
 // ─── Summary ──────────────────────────────────────────────────────────────────
 const presetName = preset ? `${preset.label}` : "Custom";
 
@@ -471,11 +449,21 @@ console.log(`
 
   Telegram:     ${telegramToken ? "enabled" : "disabled"}
   .env:         ${ENV_PATH}
-  Config:       ${CONFIG_PATH}
 
-Next steps:
-  bunx vav-agent start rover.config.ts
-  bunx vav-agent status rover.config.ts
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NEXT STEP — Get your rover.config.ts
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-${dryRun ? "\n  ⚠ DRY RUN is ON — set dryRun: false in rover.config.ts when ready for live trading.\n" : ""}
+  1. Open https://app.vav.sh/rovers
+  2. Create a Rover (or select existing one)
+  3. Click "Download Config" — saves rover.config.ts
+  4. Move rover.config.ts to this folder:
+       $(pwd)/rover.config.ts
+  5. Start your Rover:
+       bunx vav-agent start rover.config.ts
+
+  Your rover.config.ts includes your unique Rover ID
+  and Scout key — it links this machine to your
+  dashboard so status and PnL sync automatically.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `);

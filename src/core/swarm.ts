@@ -29,6 +29,10 @@ function scoutKey() {
   return sanitizeText(process.env.VAV_SCOUT_KEY || config.swarm?.scoutKey || "", 600) || "";
 }
 
+function roverId() {
+  return sanitizeText(process.env.VAV_ROVER_ID || config.swarm?.roverId || "", 200) || null;
+}
+
 export function ensureAgentId() {
   // Keep agentId stable across runs (used for logs / optional relay correlation).
   if (config.swarm?.agentId) return config.swarm.agentId;
@@ -54,11 +58,13 @@ export async function sendBeacon(payload: {
 
   const url = new URL("/beacon", swarmBaseUrl()).toString();
 
+  const rid = roverId();
   const unsigned = {
     logs: Array.isArray(payload.logs) ? payload.logs : [],
     stakes: Array.isArray(payload.stakes) ? payload.stakes : [],
     thresholds: payload.thresholds || {},
     roverVersion: sanitizeText(payload.roverVersion, 80) || "unknown",
+    ...(rid ? { roverId: rid } : {}),
   };
   const signature = signBeacon(unsigned, scoutKey());
   const body = { ...unsigned, signature };

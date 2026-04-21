@@ -6,6 +6,7 @@ import { paths, workspacePath } from "@/lib/paths";
 export type RoverPreset = "conservative" | "moderate" | "aggressive" | "safe" | "degen";
 
 export type RoverConfigFile = {
+  roverId?: string;
   swarmUrl?: string;
   scoutKey?: string;
   dryRun?: boolean;
@@ -67,6 +68,7 @@ export function applyRoverConfig({ roverConfig }: { roverConfig: RoverConfigFile
     process.env.DRY_RUN ||= "true";
   }
 
+  if (roverConfig.roverId) process.env.VAV_ROVER_ID ||= String(roverConfig.roverId);
   if (roverConfig.scoutKey) process.env.VAV_SCOUT_KEY ||= String(roverConfig.scoutKey);
   if (roverConfig.swarmUrl) process.env.VAV_SWARM_API_BASE ||= String(roverConfig.swarmUrl);
 
@@ -81,6 +83,7 @@ export function applyRoverConfig({ roverConfig }: { roverConfig: RoverConfigFile
   // Back-compat: runtime config currently reads user-config.json.
   // We keep it internal (gitignored) and regenerate from rover.config.ts as needed.
   const legacy = {
+    roverId: roverConfig.roverId,
     rpcUrl: roverConfig.rpcUrl,
     walletKey: roverConfig.walletKey,
     llmApiKey: roverConfig.llmApiKey,

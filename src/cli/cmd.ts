@@ -262,7 +262,7 @@ switch (subcommand) {
   // ── init ─────────────────────────────────────────────────────────
   case "init": {
     await import("@/cli/init");
-    out({ ok: true, created: ["rover.config.ts", ".env"] });
+    out({ ok: true, created: [".env"], next: "Download rover.config.ts from https://app.vav.sh/rovers" });
     break;
   }
 

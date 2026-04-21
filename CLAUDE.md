@@ -219,6 +219,7 @@ In the public Rover build, Swarm sync is Beacon-only (no shared lessons):
 | `DRY_RUN` | No | Skip all on-chain transactions |
 | `VAV_SWARM_API_BASE` | No | Swarm base URL (default: `https://swarm.vav.sh`) |
 | `VAV_SCOUT_KEY` | No | Scout key for Swarm + Beacon signing |
+| `VAV_ROVER_ID` | No | Rover UUID from dashboard — auto-set from rover.config.ts `roverId` field; included in every Beacon so Swarm can direct-match to DB record |
 | `HELIUS_API_KEY` | No | Enhanced wallet balance data |
 
 ---
