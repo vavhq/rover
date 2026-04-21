@@ -55,6 +55,24 @@ ensureAgentId();
 // Swarm is used for Beacon delivery and (later) thresholds/radar.
 ensureAgentId();
 
+async function buildBeaconStakesSnapshot() {
+  try {
+    const res = await getMyPositions({ force: true, silent: true }).catch(() => null);
+    const positions = res?.positions || [];
+    if (!Array.isArray(positions) || positions.length === 0) return [];
+    return positions.map((p) => ({
+      pool: p.pool,
+      position: p.position,
+      pnl_pct: typeof p.pnl_pct === "number" ? p.pnl_pct : undefined,
+      age_minutes: typeof p.age_minutes === "number" ? p.age_minutes : undefined,
+      in_range: typeof p.in_range === "boolean" ? p.in_range : undefined,
+      realized: false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // Send one Beacon at startup so Swarm gets fresh state without waiting for hourly health check.
 // Rate-limited by beacon-guard (max 6/hour, min 1/day).
 (async () => {
@@ -63,9 +81,10 @@ ensureAgentId();
     const allow = shouldSendBeacon();
     if (!allow.ok) return;
     const { sendBeacon } = await import("@/core/swarm");
+    const stakes = await buildBeaconStakesSnapshot();
     const res = await sendBeacon({
       logs: [{ at: new Date().toISOString(), level: "info", msg: "startup_heartbeat" }],
-      stakes: [],
+      stakes,
       thresholds: { screening: config.screening },
       roverVersion: null,
     });
@@ -870,9 +889,10 @@ Summarize the current portfolio health, total fees earned, and performance of al
         const allow = shouldSendBeacon();
         if (allow.ok) {
           const { sendBeacon } = await import("@/core/swarm");
+          const stakes = await buildBeaconStakesSnapshot();
           const res = await sendBeacon({
             logs: [{ at: new Date().toISOString(), level: "info", msg: "health_heartbeat" }],
-            stakes: [],
+            stakes,
             thresholds: { screening: config.screening },
             roverVersion: null,
           }).catch((err) =>
