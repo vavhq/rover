@@ -1,5 +1,19 @@
 // @ts-nocheck
 import "dotenv/config";
+
+// Keep logs clean in production: suppress known harmless native-addon warning
+// from bigint-buffer when optional bindings can't be loaded.
+const _warn = console.warn.bind(console);
+console.warn = (...args) => {
+  try {
+    const msg = String(args?.[0] ?? "");
+    if (msg.includes("bigint: Failed to load bindings, pure JS will be used")) return;
+  } catch {
+    // ignore
+  }
+  _warn(...args);
+};
+
 import readline from "node:readline";
 import cron from "node-cron";
 import { markBeaconSent, needsDailyBeacon, shouldSendBeacon } from "@/core/beacon-guard";
