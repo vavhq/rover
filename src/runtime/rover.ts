@@ -47,6 +47,7 @@ import { executeTool, registerCronRestarter } from "@/tools/deploy";
 import { closePosition, getActiveBin, getMyPositions } from "@/tools/pool";
 import { getTopCandidates } from "@/tools/scan";
 import { getWalletBalances } from "@/tools/treasury";
+import fs from "node:fs";
 
 log("startup", "Rover starting...");
 log("startup", `Mode: ${process.env.DRY_RUN === "true" ? "DRY RUN" : "LIVE"}`);
@@ -54,6 +55,17 @@ log("startup", `Model: ${process.env.LLM_MODEL || "hermes-3-405b"}`);
 ensureAgentId();
 // Swarm is used for Beacon delivery and (later) thresholds/radar.
 ensureAgentId();
+
+function getRoverVersion(): string {
+  try {
+    const pkgUrl = new URL("../../package.json", import.meta.url);
+    const pkg = JSON.parse(fs.readFileSync(pkgUrl, "utf8"));
+    const v = String(pkg?.version || "").trim();
+    return v || "unknown";
+  } catch {
+    return "unknown";
+  }
+}
 
 async function buildBeaconStakesSnapshot() {
   try {
@@ -86,7 +98,7 @@ async function buildBeaconStakesSnapshot() {
       logs: [{ at: new Date().toISOString(), level: "info", msg: "startup_heartbeat" }],
       stakes,
       thresholds: { screening: config.screening },
-      roverVersion: null,
+      roverVersion: getRoverVersion(),
     });
     if (res?.ok) {
       log("swarm", "Startup Beacon delivered");
@@ -894,7 +906,7 @@ Summarize the current portfolio health, total fees earned, and performance of al
             logs: [{ at: new Date().toISOString(), level: "info", msg: "health_heartbeat" }],
             stakes,
             thresholds: { screening: config.screening },
-            roverVersion: null,
+            roverVersion: getRoverVersion(),
           }).catch((err) =>
             log("swarm_warn", `Beacon send failed: ${err?.message || String(err)}`)
           );
