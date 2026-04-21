@@ -1,0 +1,53 @@
+# ── Dependencies ──────────────────────────────────────────────
+node_modules/
+bun.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ── Build output ──────────────────────────────────────────────
+dist/
+build/
+*.tsbuildinfo
+
+# ── Environment & secrets (NEVER commit) ──────────────────────
+.env
+.env.*
+!.env.example
+
+# ── User config (contains scoutKey, wallet key, RPC URL) ──────
+rover.config.ts
+rover.*.config.ts
+!rover.config.example.ts
+rover.config.json
+
+# ── Runtime state (user-specific, per-instance) ───────────────
+registry.json
+memory.json
+poollog.json
+tracker.json
+blocklist.json
+playbook.json
+decision-log.json
+swarm-cache.json
+signal-weights.json
+
+# ── Multi-instance guard ──────────────────────────────────────
+.rover.lock
+
+# ── Logs ──────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── OS / IDE ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ── Dev context (local scratchpads, not for commit) ───────────
+context.md
+TODO.md
+NOTES.md

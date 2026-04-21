@@ -1,0 +1,45 @@
+Business Source License 1.1
+
+License text copyright (c) 2026 Aivoos
+
+Parameters
+
+Licensor:             Aivoos
+Licensed Work:        Rover (the "Licensed Work") — vav.sh liquidity provider
+                      agent for Solana.
+Additional Use Grant: You may use, copy, modify, and run the Licensed Work for
+                      non-commercial and internal evaluation purposes, including
+                      development and testing on your own wallet, provided that
+                      such use does not provide the Licensed Work (or a
+                      substantially similar service) to third parties as a
+                      hosted or managed service.
+Change Date:          2028-04-20
+Change License:       Apache License, Version 2.0
+
+Terms
+
+The Licensor hereby grants you the right to copy, modify, create derivative
+works, redistribute, and make non-production use of the Licensed Work, subject
+to the limitations described in this License.
+
+You may not use the Licensed Work for a "Production Use" (as defined below)
+until the Change Date.
+
+Production Use means any use of the Licensed Work where the Licensed Work (or a
+substantially similar service) is provided to third parties for a fee or used
+to generate revenue, including offering it as a hosted or managed service.
+Running Rover against your own wallet with your own capital is NOT Production
+Use and is expressly permitted.
+
+On the Change Date, the Licensor will make the Licensed Work available under
+the Change License.
+
+This License does not grant you rights to use the Licensor's trademarks,
+service marks, or logos.
+
+THE LICENSED WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE LICENSED WORK OR THE USE OR OTHER DEALINGS IN THE LICENSED WORK.

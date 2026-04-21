@@ -1,0 +1,88 @@
+{
+  "name": "@vav/rover",
+  "version": "0.4.0",
+  "description": "Autonomous Meteora DLMM liquidity provider agent for Solana — vav.sh Rover",
+  "type": "module",
+  "bin": {
+    "vav-agent": "dist/cmd.js",
+    "rover": "dist/rover.js"
+  },
+  "main": "dist/rover.js",
+  "types": "dist/rover.d.ts",
+  "files": [
+    "dist/",
+    "rover.config.example.ts",
+    ".env.example",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "DRY_RUN=true bun src/runtime/rover.ts",
+    "start": "bun src/runtime/rover.ts",
+    "init": "bun src/cli/init.ts",
+    "cmd": "bun src/cli/cmd.ts",
+    "signal": "bun src/signal/index.ts",
+    "vocab": "node scripts/vocab-gate.mjs",
+    "smoke:swarm": "node scripts/smoke-swarm.mjs",
+    "dogfood": "node scripts/dogfood.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "bun test tests/",
+    "test:unit": "bun test tests/unit/",
+    "test:integration": "bun test tests/integration/",
+    "clean": "rm -rf dist node_modules .rover.lock",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@meteora-ag/dlmm": "1.9.4",
+    "@solana/web3.js": "^1.95.0",
+    "axios": "^1.12.2",
+    "bn.js": "^5.2.1",
+    "bs58": "^5.0.0",
+    "discord.js-selfbot-v13": "^3.6.2",
+    "dotenv": "^17.3.1",
+    "jsonrepair": "^3.13.3",
+    "node-cron": "^3.0.3",
+    "openai": "^4.73.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.6",
+    "@types/bn.js": "^5.1.6",
+    "@types/bun": "^1.2.0",
+    "@types/node": "^22.10.0",
+    "@types/node-cron": "^3.0.11",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "bun": ">=1.1.0"
+  },
+  "keywords": [
+    "solana",
+    "meteora",
+    "dlmm",
+    "liquidity-provider",
+    "defi",
+    "agent",
+    "vav.sh",
+    "rover"
+  ],
+  "homepage": "https://vav.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/vavhq/rover.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vavhq/rover/issues"
+  },
+  "license": "BUSL-1.1",
+  "author": "Aivoos <dev@vav.sh> (https://vav.sh)",
+  "publishConfig": {
+    "access": "public"
+  }
+}
