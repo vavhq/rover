@@ -1,5 +1,5 @@
-# go-rover/rover — image terpisah dari monorepo gorover-app (bukan `Dockerfile.rover` di repo itu).
-# Railway: Settings → Build → Docker, atau `railway.toml` [build] builder = DOCKERFILE, dockerfilePath = /Dockerfile
+# go-rover/rover — separate from the gorover-app monorepo (which uses e.g. Dockerfile.rover there).
+# Railway: Settings → Build → Docker, or `railway.toml` with builder = DOCKERFILE, dockerfilePath = Dockerfile
 
 FROM oven/bun:1.3 AS build
 WORKDIR /app

@@ -112,21 +112,23 @@ This is the simplest way to run Rover as a single always-on instance.
 
 **Build:** this repo includes a root **`Dockerfile`** (Bun + `bun run build` + `dist/cmd.js` start). On Railway, use the **Docker** builder with `dockerfilePath` = `Dockerfile` (default if `railway.toml` is used). The monorepo **gorover-app** uses different names (e.g. `Dockerfile.rover`) — do not point this service at those paths.
 
-### 2) Set the start command
+### 2) Start command
 
-In Railway → Service settings:
+**Docker (default when using `railway.toml`):** the image already sets `bun dist/cmd.js start rover.config.example.ts`. Keep Railway’s **Start Command** in sync with `railway.toml`, or leave it to the Dockerfile if your service uses config-as-code only.
 
-- **Start Command** (deploy from Git / Railpack — uses Bun + sumber, **tanpa** binary npm global):
+**Local / development** (Bun, no global npm install required):
 
 ```bash
 bun run start:agent
 ```
 
-It runs `bun src/cli/cmd.ts start rover.config.example.ts`; set real secrets in Railway **Variables** (they override the example file). Equivalent locally after `bun run build` / `npm i -g`:
+That runs `bun src/cli/cmd.ts start rover.config.example.ts`. For production, use the built CLI after `bun run build` / `npm i -g @gorover/agent`:
 
 ```bash
 gorover-agent start rover.config.ts
 ```
+
+Set real secrets in Railway **Variables** (they override the example file).
 
 For safe dogfood (recommended first) set in Railway: `DRY_RUN=true` plus the variables below.
 

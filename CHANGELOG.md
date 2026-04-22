@@ -5,20 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) — Semantic Ve
 
 ---
 
-## [Unreleased] — GoRover Wire (ROADMAP W3 D12)
+## [Unreleased]
+
+_Nothing yet._
+
+## [0.4.3] — 2026-04-23
 
 ### Added
-- `Dockerfile` + `.dockerignore` — image multi-stage (Bun `dist/cmd.js`); Railway `builder = DOCKERFILE`, `dockerfilePath = Dockerfile` (bukan `Dockerfile.rover` di monorepo lain)
-- `railway.toml` — build Docker + `startCommand` memakai `bun dist/cmd.js start rover.config.example.ts` (selaras CMD image; env Railway override config)
+- `Dockerfile` + `.dockerignore` — multi-stage image (Bun, `dist/cmd.js`); Railway: `builder = DOCKERFILE`, `dockerfilePath = Dockerfile` (not `Dockerfile.rover` from the gorover-app monorepo)
+- `railway.toml` — Docker build + `startCommand` `bun dist/cmd.js start rover.config.example.ts` (matches image CMD; Railway env can override config)
 - `package.json` → `start:agent`, `packageManager: bun@1.3.10`
-- `tests/unit/health.test.ts` — minimal unit test agar `bun run test:unit` / dogfood valid
-- `scripts/dogfood.mjs` — default `test:unit` (integrasi butuh kunci API; `DOGFOOD_INTEGRATION=1` untuk full `test`)
+- `tests/unit/health.test.ts` — minimal unit test so `bun run test:unit` / dogfood are valid
+- `scripts/dogfood.mjs` — defaults to `test:unit` (integration needs API keys; set `DOGFOOD_INTEGRATION=1` for full `test`)
 
 ### Changed
-- `bun run lint:fix` + `biome.jsonc` — hilangkan `experimentalScannerIgnores` deprecated
-- `README` — instruksi Railway memakai `bun run start:agent`
-- CI — job Test memakai `test:unit` (sama dogfood)
-- `src/core/swarm.ts` — hapus helper `roverId` lokal yang tidak terpakai di payload Beacon (sesuai skema Swarm saat ini)
+- `bun run lint:fix` + `biome.jsonc` — remove deprecated `experimentalScannerIgnores`
+- `README` — Railway deploy instructions; English-only deployment docs
+- CI — Test job uses `test:unit` (same as dogfood)
+- `src/core/swarm.ts` — remove unused local `roverId` helper in Beacon payload (per current Swarm schema)
 - Published as `@gorover/agent` (npm), CLI `gorover-agent`
 - CLI binary renamed to `gorover-agent`
 - Default Swarm URL updated to `https://swarm.gorover.xyz`
