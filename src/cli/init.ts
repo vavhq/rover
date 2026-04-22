@@ -196,7 +196,38 @@ const heliusKey = await ask(
   alreadySet(ev("HELIUS_API_KEY", ""))
 );
 
-// ─── Section 2: Telegram ──────────────────────────────────────────────────────
+// ─── Section 2: Scout Key (GoRover) ──────────────────────────────────────────
+console.log("\n── GoRover Scout Key ─────────────────────────────────────────");
+console.log("  Get your Scout key from https://app.gorover.xyz → Rovers → New Rover");
+
+let scoutKey = await ask(
+  "Scout key (sc_...)",
+  ev("GOROVER_SCOUT_KEY", "")
+);
+
+if (scoutKey && !scoutKey.startsWith("sc_")) {
+  console.log("  ⚠ Scout key must start with sc_ — skipping Swarm validation.");
+  scoutKey = "";
+}
+
+// Validate Swarm connection
+const swarmUrl = "https://swarm.gorover.xyz";
+if (scoutKey) {
+  process.stdout.write("  Testing Swarm connection... ");
+  try {
+    const res = await fetch(`${swarmUrl}/health`, { signal: AbortSignal.timeout(5000) });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.ok) {
+      console.log(`✅ Connected (${data.version || "ok"})`);
+    } else {
+      console.log("⚠ Swarm responded but returned unexpected data — continuing.");
+    }
+  } catch {
+    console.log("⚠ Could not reach swarm.gorover.xyz — check your internet. Continuing.");
+  }
+}
+
+// ─── Section 3: Telegram ──────────────────────────────────────────────────────
 console.log("\n── Telegram (optional — skip to disable) ─────────────────────");
 
 const telegramToken = await ask("Telegram bot token", alreadySet(ev("TELEGRAM_BOT_TOKEN", "")));
@@ -206,7 +237,7 @@ const telegramChatId = await ask(
   ev("TELEGRAM_CHAT_ID", e("telegramChatId", ""))
 );
 
-// ─── Section 3: Preset ────────────────────────────────────────────────────────
+// ─── Section 4: Preset ────────────────────────────────────────────────────────
 const presetChoice = await askChoice("Select a risk preset:", [
   { label: `🔥 Degen    — ${PRESETS.degen.description}`, key: "degen" },
   { label: `⚖️  Moderate — ${PRESETS.moderate.description}`, key: "moderate" },
@@ -223,7 +254,7 @@ console.log(
     : `\nCustom mode — configure all settings.\n`
 );
 
-// ─── Section 4: Deployment ────────────────────────────────────────────────────
+// ─── Section 5: Deployment ────────────────────────────────────────────────────
 console.log("── Deployment ────────────────────────────────────────────────");
 
 const deployAmountSol = await askNum("SOL to deploy per position", e("deployAmountSol", 0.3), {
@@ -244,7 +275,7 @@ const minSolToOpen = await askNum(
 
 const dryRun = await askBool("Dry run mode? (no real transactions)", e("dryRun", true));
 
-// ─── Section 5: Risk & Filters ────────────────────────────────────────────────
+// ─── Section 6: Risk & Filters ────────────────────────────────────────────────
 console.log("\n── Risk & Filters ────────────────────────────────────────────");
 
 const timeframe = await ask(
@@ -263,7 +294,7 @@ const _maxMcap = await askNum("Max token market cap USD", p("maxMcap", 10_000_00
   min: 100_000,
 });
 
-// ─── Section 6: Exit Rules ────────────────────────────────────────────────────
+// ─── Section 7: Exit Rules ────────────────────────────────────────────────────
 console.log("\n── Exit Rules ────────────────────────────────────────────────");
 
 const takeProfitFeePct = await askNum(
@@ -311,7 +342,7 @@ const _repeatDeployCooldownMinFeeEarnedPct = await askNum(
   { min: 0 }
 );
 
-// ─── Section 7: Scheduling ────────────────────────────────────────────────────
+// ─── Section 8: Scheduling ────────────────────────────────────────────────────
 console.log("\n── Scheduling ────────────────────────────────────────────────");
 
 const managementIntervalMin = await askNum(
@@ -326,7 +357,7 @@ const screeningIntervalMin = await askNum(
   { min: 5 }
 );
 
-// ─── Section 8: LLM Provider ─────────────────────────────────────────────────
+// ─── Section 9: LLM Provider ─────────────────────────────────────────────────
 console.log("\n── LLM Provider ──────────────────────────────────────────────");
 
 const LLM_PROVIDERS = [
@@ -414,6 +445,7 @@ const envMap = {
   ...(isKept(walletKey) ? {} : { WALLET_PRIVATE_KEY: walletKey }),
   ...(rpcUrl ? { RPC_URL: rpcUrl } : {}),
   ...(isKept(heliusKey) ? {} : { HELIUS_API_KEY: heliusKey }),
+  ...(scoutKey ? { GOROVER_SCOUT_KEY: scoutKey } : {}),
   ...(isKept(telegramToken) ? {} : { TELEGRAM_BOT_TOKEN: telegramToken }),
   ...(telegramChatId ? { TELEGRAM_CHAT_ID: telegramChatId } : {}),
   ...(llmBaseUrl ? { LLM_BASE_URL: llmBaseUrl } : {}),
@@ -422,6 +454,47 @@ const envMap = {
   DRY_RUN: dryRun ? "true" : "false",
 };
 fs.writeFileSync(ENV_PATH, buildEnv(envMap));
+
+// ─── Generate rover.config.ts ─────────────────────────────────────────────────
+const presetKey = preset ? presetChoice.key : "moderate";
+const slippage = presetKey === "degen" ? 200 : presetKey === "safe" ? 50 : 100;
+
+const configContent = `import type { RoverConfig } from "./rover.config.example";
+
+export const roverConfig: RoverConfig = {
+  // ─── GoRover ─────────────────────────────────────────────────────
+  vavScoutKey:       "${scoutKey || "sc_YOUR_SCOUT_KEY"}",
+  vavSwarmUrl:       "https://swarm.gorover.xyz",
+  vavReferralWallet: "GOROVER_SOL_WALLET",
+
+  // ─── Wallet & RPC (loaded from .env) ─────────────────────────────
+  walletKey:         process.env.WALLET_PRIVATE_KEY || "",
+  rpcUrl:            process.env.RPC_URL || "${rpcUrl}",
+
+  // ─── LLM ─────────────────────────────────────────────────────────
+  llmKey:            process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY || "",
+  llmModel:          "${llmModel}",
+
+  // ─── Behavior ────────────────────────────────────────────────────
+  preset:            "${presetKey === "degen" ? "aggressive" : presetKey === "safe" ? "conservative" : "moderate"}",
+  dryRun:            ${dryRun},
+
+  // ─── Safety ──────────────────────────────────────────────────────
+  minBalanceSol:     ${minSolToOpen},
+  minPositionSol:    ${deployAmountSol},
+  slippageBps:       ${slippage},
+
+  // ─── Optional ────────────────────────────────────────────────────
+  telegramChatId:    "${telegramChatId || ""}",
+  maxPositions:      ${maxPositions},
+  seekerIntervalMs:  ${screeningIntervalMin * 60 * 1000},
+  keeperIntervalMs:  ${managementIntervalMin * 60 * 1000},
+};
+`;
+
+if (!fs.existsSync(CONFIG_PATH)) {
+  fs.writeFileSync(CONFIG_PATH, configContent);
+}
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
 const presetName = preset ? `${preset.label}` : "Custom";
@@ -451,19 +524,19 @@ console.log(`
   .env:         ${ENV_PATH}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  NEXT STEP — Get your rover.config.ts
+  NEXT STEP
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${fs.existsSync(CONFIG_PATH)
+  ? `  ✅ rover.config.ts already exists — not overwritten.`
+  : `  ✅ rover.config.ts generated in this folder.`}
 
-  1. Open https://app.gorover.xyz/rovers
-  2. Create a Rover (or select existing one)
-  3. Click "Download Config" — saves rover.config.ts
-  4. Move rover.config.ts to this folder:
-       $(pwd)/rover.config.ts
-  5. Start your Rover:
-       gorover-agent start rover.config.ts
+  Start your Rover:
+    gorover-agent start rover.config.ts
 
-  Your rover.config.ts includes your unique Rover ID
-  and Scout key — it links this machine to your
-  dashboard so status and PnL sync automatically.
+  Check status:
+    gorover-agent status rover.config.ts
+
+  Stop your Rover:
+    gorover-agent stop
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `);

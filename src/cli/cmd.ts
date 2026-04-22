@@ -614,13 +614,88 @@ switch (subcommand) {
     const cfgPath = argv.filter((a) => !a.startsWith("-"))[1];
     if (!cfgPath) die("Usage: gorover-agent start <rover.config.ts>");
 
+    const LOCK_FILE = path.join(process.cwd(), ".rover.lock");
+    const REGISTRY_FILE = path.join(process.cwd(), "registry.json");
+
+    // ── .rover.lock guard ──────────────────────────────────────────
+    if (fs.existsSync(LOCK_FILE)) {
+      try {
+        const lock = JSON.parse(fs.readFileSync(LOCK_FILE, "utf8"));
+        // Check if PID is still alive
+        process.kill(lock.pid, 0);
+        die(`Rover already running (PID ${lock.pid}). Run: gorover-agent stop`);
+      } catch (e: any) {
+        if (e.code === "EPERM") {
+          die(`Rover already running. Run: gorover-agent stop`);
+        }
+        // Process not found — stale lock, clean it up
+        fs.rmSync(LOCK_FILE, { force: true });
+        process.stderr.write("[gorover-agent] Stale lock file removed.\n");
+      }
+    }
+
+    // ── Crash recovery check ───────────────────────────────────────
+    if (fs.existsSync(REGISTRY_FILE)) {
+      try {
+        const registry = JSON.parse(fs.readFileSync(REGISTRY_FILE, "utf8"));
+        const open = Object.values(registry.positions || {}).filter((p: any) => !p.closed);
+        if (open.length > 0) {
+          process.stderr.write(`[gorover-agent] ⚠ Crash recovery: ${open.length} open Stake(s) found. Keeper will check immediately.\n`);
+        }
+      } catch { /* registry.json unreadable — will be handled at runtime */ }
+    }
+
+    // ── Version check ──────────────────────────────────────────────
+    try {
+      const pkgJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+      const current = pkgJson.version;
+      const res = await fetch("https://registry.npmjs.org/@gorover/agent/latest", {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (res.ok) {
+        const latest = ((await res.json()) as any).version;
+        if (latest && latest !== current) {
+          process.stderr.write(`[gorover-agent] ⚠ New version available: ${latest} (you have ${current}). Run: bun update @gorover/agent\n`);
+        }
+      }
+    } catch { /* non-blocking — skip if offline or npm down */ }
+
     const { applyRoverConfig, loadRoverConfig } = await import("@/core/rover-config");
     const { roverConfig } = await loadRoverConfig(cfgPath);
     applyRoverConfig({ roverConfig });
 
+    // Write lock file
+    fs.writeFileSync(LOCK_FILE, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+    process.on("exit", () => fs.rmSync(LOCK_FILE, { force: true }));
+    process.on("SIGINT", () => process.exit(0));
+    process.on("SIGTERM", () => process.exit(0));
+
+    process.stderr.write(`[gorover-agent] Rover started (PID ${process.pid})\n`);
     const { startCronJobs } = await import("@/runtime/rover");
-    process.stderr.write("[gorover-agent] Starting Rover runtime...\n");
     startCronJobs();
+    break;
+  }
+
+  // ── stop ─────────────────────────────────────────────────────────
+  case "stop": {
+    const LOCK_FILE = path.join(process.cwd(), ".rover.lock");
+    if (!fs.existsSync(LOCK_FILE)) {
+      die("No Rover running (no .rover.lock found).");
+    }
+    try {
+      const lock = JSON.parse(fs.readFileSync(LOCK_FILE, "utf8"));
+      process.kill(lock.pid, "SIGTERM");
+      fs.rmSync(LOCK_FILE, { force: true });
+      out({ ok: true, stopped: true, pid: lock.pid });
+    } catch (e: any) {
+      if (e.code === "ESRCH") {
+        // Process already gone
+        fs.rmSync(LOCK_FILE, { force: true });
+        out({ ok: true, stopped: true, note: "Process was already stopped. Lock file removed." });
+      } else {
+        die(`Failed to stop Rover: ${e.message}`);
+      }
+    }
     break;
   }
 
