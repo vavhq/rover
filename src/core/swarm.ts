@@ -74,7 +74,7 @@ export async function sendBeacon(payload: {
     headers: {
       accept: "application/json",
       "content-type": "application/json",
-      "x-vav-scout-key": scoutKey(),
+      "x-gorover-scout-key": scoutKey(),
     },
     body: JSON.stringify(body),
   });
