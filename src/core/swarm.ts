@@ -93,7 +93,13 @@ export async function sendBeacon(payload: {
 export async function fetchThresholds() {
   if (!swarmBaseUrl()) return { ok: false, error: "SWARM_NOT_CONFIGURED" };
   const url = new URL("/thresholds", swarmBaseUrl()).toString();
-  const res = await fetch(url, { headers: { accept: "application/json" } });
+  const key = scoutKey()
+  const res = await fetch(url, {
+    headers: {
+      accept: "application/json",
+      ...(key ? { "x-gorover-scout-key": key } : {}),
+    },
+  });
   const json = await res.json().catch(() => null);
   if (!res.ok) return { ok: false, status: res.status, error: json?.error || "THRESHOLDS_FAILED" };
   return json;
