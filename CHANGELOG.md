@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) — Semantic Ve
 
 ### Added
 - `src/core/llm-resolve.ts` — auto-resolve OpenAI-compatible LLM base URL + API key from env (OpenRouter, OpenAI, Groq, Gemini, `LLM_BASE_URL` local/custom, `LLM_API_KEY` prefix heuristics); startup log line from `gorover-agent start`
+- CI hardening (Railway parity): Node `22.12.0` + Bun `1.3.13`, `workflow_dispatch` + concurrency cancel-in-progress, and Docker image build gate in CI to mirror Railway DOCKERFILE deployment
 
 ## [0.4.3] — 2026-04-23
 
