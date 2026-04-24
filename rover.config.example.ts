@@ -30,6 +30,15 @@ export type RoverConfig = {
    * You can also set DRY_RUN=true in your .env.
    */
   dryRun: boolean;
+  /**
+   * Beacon strategy contract (V1).
+   * - Self-hosted default: kind=custom
+   * - Managed should use: kind=official + strategyId/specVersion from platform registry
+   */
+  strategyKind?: "official" | "custom" | "legacy";
+  strategyId?: string;
+  strategySpecVersion?: string;
+  protocolVersion?: string;
 
   // ─── Safety ──────────────────────────────────────────────────────
   /** Skip Enter if wallet balance below this (SOL). Default: 0.1 */
@@ -68,6 +77,10 @@ export const roverConfig: RoverConfig = {
   // ─── Behavior ────────────────────────────────────────────────────
   preset: "moderate",
   dryRun: true,
+  strategyKind: "custom",
+  strategyId: "selfhosted.bid_ask",
+  strategySpecVersion: "1.0.0",
+  protocolVersion: "1.0",
 
   // ─── Safety ──────────────────────────────────────────────────────
   minBalanceSol: 0.1,

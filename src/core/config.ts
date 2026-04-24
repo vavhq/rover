@@ -6,6 +6,7 @@ const ROVER_CONFIG_JSON_PATH = workspacePath("rover.config.json");
 const DEFAULT_SWARM_URL = process.env.GOROVER_SWARM_URL ?? "https://swarm.gorover.xyz";
 const DEFAULT_DISCOVERY_API_URL = (process.env.GOROVER_DISCOVERY_API_URL ?? "").replace(/\/+$/, "");
 const DEFAULT_DISCOVERY_PUBLIC_KEY = process.env.GOROVER_DISCOVERY_API_KEY ?? "";
+const DEFAULT_STRATEGY_PROTOCOL_VERSION = "1.0";
 /** Must match Swarm on-chain verify (`apps/swarm/src/verify/stakes.ts`) default when env unset. */
 const DEFAULT_JUPITER_REFERRAL = "DM11KnLdEKENRbZyfehKN3ZM2JcjW9Suops1LFFkZH3u";
 
@@ -125,6 +126,29 @@ export const config: any = {
   strategy: {
     strategy: u.strategy ?? "bid_ask",
     binsBelow: u.binsBelow ?? 69,
+  },
+  strategyContract: {
+    // Managed should set this to "official" and provide strategy id + spec version.
+    kind: nonEmptyString(
+      process.env.GOROVER_STRATEGY_KIND,
+      u.strategyKind,
+      "custom"
+    ) as "official" | "custom" | "legacy",
+    id: nonEmptyString(
+      process.env.GOROVER_STRATEGY_ID,
+      u.strategyId,
+      `selfhosted.${u.strategy ?? "bid_ask"}`
+    ),
+    specVersion: nonEmptyString(
+      process.env.GOROVER_STRATEGY_SPEC_VERSION,
+      u.strategySpecVersion,
+      "1.0.0"
+    ),
+    protocolVersion: nonEmptyString(
+      process.env.GOROVER_PROTOCOL_VERSION,
+      u.protocolVersion,
+      DEFAULT_STRATEGY_PROTOCOL_VERSION
+    ),
   },
 
   // ─── Scheduling ─────────────────────────

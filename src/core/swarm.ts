@@ -53,12 +53,22 @@ export async function sendBeacon(payload: {
   }
 
   const url = new URL("/beacon", swarmBaseUrl()).toString();
+  const strategyKind = sanitizeText(config.strategyContract?.kind, 20) || "custom";
+  const strategyId =
+    sanitizeText(config.strategyContract?.id, 120) ||
+    `selfhosted.${sanitizeText(config.strategy?.strategy, 40) || "bid_ask"}`;
+  const strategySpecVersion = sanitizeText(config.strategyContract?.specVersion, 40) || "1.0.0";
+  const protocolVersion = sanitizeText(config.strategyContract?.protocolVersion, 20) || "1.0";
 
   const unsigned = {
     logs: Array.isArray(payload.logs) ? payload.logs : [],
     stakes: Array.isArray(payload.stakes) ? payload.stakes : [],
     thresholds: payload.thresholds || {},
     version: sanitizeText(payload.roverVersion, 80) || "0.1.0",
+    protocolVersion,
+    strategyKind,
+    strategyId,
+    strategySpecVersion,
   };
   const signature = signBeacon(unsigned, scoutKey());
   const body = { ...unsigned, signature };

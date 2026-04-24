@@ -16,6 +16,10 @@ export type RoverConfigFile = {
 
   dryRun?: boolean;
   preset?: RoverPreset;
+  strategyKind?: "official" | "custom" | "legacy";
+  strategyId?: string;
+  strategySpecVersion?: string;
+  protocolVersion?: string;
 
   // optional operational settings (secrets should stay in .env)
   rpcUrl?: string;
@@ -92,6 +96,12 @@ export function applyRoverConfig({ roverConfig }: { roverConfig: RoverConfigFile
   if (scoutKey) process.env.GOROVER_SCOUT_KEY ||= String(scoutKey);
   const swarmUrl = roverConfig.goroverSwarmUrl ?? roverConfig.swarmUrl;
   if (swarmUrl) process.env.GOROVER_SWARM_API_BASE ||= String(swarmUrl);
+  if (roverConfig.strategyKind) process.env.GOROVER_STRATEGY_KIND ||= String(roverConfig.strategyKind);
+  if (roverConfig.strategyId) process.env.GOROVER_STRATEGY_ID ||= String(roverConfig.strategyId);
+  if (roverConfig.strategySpecVersion)
+    process.env.GOROVER_STRATEGY_SPEC_VERSION ||= String(roverConfig.strategySpecVersion);
+  if (roverConfig.protocolVersion)
+    process.env.GOROVER_PROTOCOL_VERSION ||= String(roverConfig.protocolVersion);
 
   // Persist a snapshot for synchronous config loading.
   const jsonPath = workspacePath("rover.config.json");
@@ -114,6 +124,10 @@ export function applyRoverConfig({ roverConfig }: { roverConfig: RoverConfigFile
     swarmUrl: roverConfig.swarmUrl,
     scoutKey: roverConfig.scoutKey,
     preset: roverConfig.preset,
+    strategyKind: roverConfig.strategyKind,
+    strategyId: roverConfig.strategyId,
+    strategySpecVersion: roverConfig.strategySpecVersion,
+    protocolVersion: roverConfig.protocolVersion,
   };
   try {
     fs.writeFileSync(paths.userConfigJson(), JSON.stringify(legacy, null, 2));
