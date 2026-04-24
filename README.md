@@ -369,9 +369,10 @@ gorover-agent balance
 
 ---
 
-## Discord listener
+## Signal ingest (ToS-compliant)
 
-The Discord listener watches configured channels (e.g. LP Army) for Solana token calls and queues them as signals for the screener agent.
+Rover runs an HTTP ingest endpoint for third-party signal sources (Discord bot, Telegram bot, webhook relay, etc).  
+Incoming text is parsed for Solana addresses, then queued for the screener agent after pre-checks.
 
 ### Setup
 
@@ -382,13 +383,10 @@ bun run signal
 Add to your root `.env`:
 
 ```env
-DISCORD_USER_TOKEN=your_discord_account_token   # from browser DevTools → Network
-DISCORD_GUILD_ID=the_server_id
-DISCORD_CHANNEL_IDS=channel1,channel2            # comma-separated
-DISCORD_MIN_FEES_SOL=5                           # minimum pool fees to pass pre-check
+SIGNAL_INGEST_TOKEN=replace_with_long_random_secret
+SIGNAL_INGEST_PORT=8787
+SIGNAL_INGEST_HOST=0.0.0.0
 ```
-
-> This uses a selfbot (personal account automation, not a bot token). Use responsibly.
 
 ### Run
 
@@ -396,7 +394,16 @@ DISCORD_MIN_FEES_SOL=5                           # minimum pool fees to pass pre
 bun run signal
 ```
 
-Or run it in a separate terminal alongside the main agent. Signals are written to `discord-signals.json` and picked up automatically by `/screen` and `gorover-agent screen`.
+Send signal payloads:
+
+```bash
+curl -X POST "http://127.0.0.1:8787/signals/ingest" \
+  -H "Authorization: Bearer $SIGNAL_INGEST_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"New call: 9xQeWvG816bUx9EPfJ6cD7a5JEGg9smGxX7Y4sRz9kDf","source":"discord-bot","author":"LP Army Bot","channel":"calls"}'
+```
+
+Signals are written to `discord-signals.json` (legacy filename for compatibility) and picked up automatically by `/screen` and `gorover-agent screen`.
 
 ### Signal pipeline
 
@@ -405,7 +412,7 @@ Each incoming token address passes through a pre-check pipeline before being que
 2. **Blacklist** — rejects blacklisted token mints
 3. **Pool resolution** — resolves the address to a Meteora DLMM pool
 4. **Rug check** — checks deployer against `deployer-blacklist.json`
-5. **Fees check** — rejects pools below `DISCORD_MIN_FEES_SOL`
+5. **Fees check** — rejects pools below `minTokenFeesSol` threshold
 
 Signals that pass all checks are queued with status `pending`. The screener picks up pending signals and processes them as priority candidates before running the normal screening cycle.
 
@@ -416,9 +423,13 @@ Add known rug/farm deployer wallet addresses to `deployer-blacklist.json`:
 ```json
 {
   "_note": "Known farm/rug deployers — add addresses to auto-reject their pools",
-  "addresses": [
-    "WaLLeTaDDressHere"
-  ]
+  "blocked": {
+    "WaLLeTaDDressHere": {
+      "label": "known_rugger",
+      "reason": "manual seed",
+      "added_at": "2026-01-01T00:00:00.000Z"
+    }
+  }
 }
 ```
 
@@ -430,7 +441,7 @@ Add known rug/farm deployer wallet addresses to `deployer-blacklist.json`:
 
 1. Create a bot via [@BotFather](https://t.me/BotFather) and copy the token
 2. Add `TELEGRAM_BOT_TOKEN=<token>` to your `.env`
-3. Start the agent, then send any message to your bot — it auto-registers your chat ID
+3. Start the agent, then run `/setchat` from your Telegram account to bind the active chat ID
 
 ### Notifications
 
