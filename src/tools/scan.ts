@@ -22,6 +22,12 @@ const PVP_MIN_GLOBAL_FEES_SOL = 30;
 const MIN_FINAL_SCORE = Number(process.env.ROVER_MIN_FINAL_SCORE || 50);
 const MAX_RISK_PENALTY = Number(process.env.ROVER_MAX_RISK_PENALTY || 30);
 const MIN_TIMING_SCORE = Number(process.env.ROVER_MIN_TIMING_SCORE || 10);
+const DLMM_V1_RISK_PENALTY = Number(process.env.ROVER_DLMM_V1_RISK_PENALTY || 2);
+const DLMM_UNKNOWN_RISK_PENALTY = Number(process.env.ROVER_DLMM_UNKNOWN_RISK_PENALTY || 4);
+const MIN_FINAL_SCORE_DLMM_V1 = Number(process.env.ROVER_MIN_FINAL_SCORE_DLMM_V1 || MIN_FINAL_SCORE + 2);
+const MIN_FINAL_SCORE_DLMM_UNKNOWN = Number(
+  process.env.ROVER_MIN_FINAL_SCORE_DLMM_UNKNOWN || MIN_FINAL_SCORE + 5
+);
 
 function normalizeSymbol(symbol) {
   return String(symbol || "")
@@ -122,9 +128,16 @@ function computeRiskPenalty(pool) {
 
   const washPenalty = pool.is_wash ? 6 : 0;
   const pvpPenalty = pool.is_pvp ? 6 : 0;
+  const dlmmVersion = normalizeDlmmVersion(pool.dlmm_version || pool.pool_type || pool.version);
+  const dlmmPenalty =
+    dlmmVersion === "v1"
+      ? DLMM_V1_RISK_PENALTY
+      : dlmmVersion === "unknown"
+        ? DLMM_UNKNOWN_RISK_PENALTY
+        : 0;
 
   const total = clamp(
-    rugPenalty + ruggedPenalty + top10Penalty + botPenalty + washPenalty + pvpPenalty,
+    rugPenalty + ruggedPenalty + top10Penalty + botPenalty + washPenalty + pvpPenalty + dlmmPenalty,
     0,
     40
   );
@@ -136,6 +149,8 @@ function computeRiskPenalty(pool) {
     botPenalty: Number(botPenalty.toFixed(2)),
     washPenalty,
     pvpPenalty,
+    dlmmPenalty,
+    dlmmVersion,
   };
 }
 
@@ -162,7 +177,22 @@ function computeFinalScoreBreakdown(pool) {
     timing,
     risk,
     interpretation: interpretFinalScore(finalScore),
+    dlmmVersion: risk.dlmmVersion,
   };
+}
+
+function normalizeDlmmVersion(value) {
+  const v = String(value || "").trim().toLowerCase();
+  if (!v) return "unknown";
+  if (v.includes("v2") || v === "2") return "v2";
+  if (v.includes("v1") || v === "1") return "v1";
+  return "unknown";
+}
+
+function minFinalScoreForDlmmVersion(version) {
+  if (version === "v1") return MIN_FINAL_SCORE_DLMM_V1;
+  if (version === "unknown") return MIN_FINAL_SCORE_DLMM_UNKNOWN;
+  return MIN_FINAL_SCORE;
 }
 
 async function fetchRugcheckSummary(mint) {
@@ -733,6 +763,7 @@ export async function getTopCandidates({ limit = 10 } = {}) {
       const breakdown = computeFinalScoreBreakdown(pool);
       return {
         ...pool,
+        dlmm_version: breakdown.dlmmVersion,
         final_score: breakdown.finalScore,
         quality_score: breakdown.qualityScore,
         timing_score: breakdown.timingScore,
@@ -763,11 +794,12 @@ export async function getTopCandidates({ limit = 10 } = {}) {
         );
         return false;
       }
-      if (pool.final_score < MIN_FINAL_SCORE) {
+      const minByVersion = minFinalScoreForDlmmVersion(pool.dlmm_version);
+      if (pool.final_score < minByVersion) {
         pushFilteredReason(
           filteredOut,
           pool,
-          `final gate: final score ${pool.final_score} < ${MIN_FINAL_SCORE}`
+          `final gate: final score ${pool.final_score} < ${minByVersion} for dlmm ${pool.dlmm_version}`
         );
         return false;
       }
@@ -822,6 +854,7 @@ export async function getPoolDetail({ pool_address, timeframe = "5m" }) {
  * Raw API returns ~100+ fields per pool. The LLM only needs ~20.
  */
 function condensePool(p) {
+  const dlmmVersion = normalizeDlmmVersion(p.dlmm_version || p.version || p.pool_type);
   return {
     pool: p.pool_address,
     name: p.name,
@@ -836,6 +869,7 @@ function condensePool(p) {
       mint: p.token_y?.address,
     },
     pool_type: p.pool_type,
+    dlmm_version: dlmmVersion,
     bin_step: p.dlmm_params?.bin_step || null,
     fee_pct: p.fee_pct,
 
