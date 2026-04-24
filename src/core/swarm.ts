@@ -29,6 +29,15 @@ function scoutKey() {
   return sanitizeText(process.env.GOROVER_SCOUT_KEY || config.swarm?.scoutKey || "", 600) || "";
 }
 
+function swarmHeaders() {
+  const key = scoutKey();
+  return {
+    accept: "application/json",
+    "content-type": "application/json",
+    ...(key ? { "x-gorover-scout-key": key } : {}),
+  };
+}
+
 export function ensureAgentId() {
   // Keep agentId stable across runs (used for logs / optional relay correlation).
   if (config.swarm?.agentId) return config.swarm.agentId;
@@ -41,6 +50,10 @@ export function ensureAgentId() {
 export function isSwarmEnabled() {
   return !!(swarmBaseUrl() && scoutKey());
 }
+
+const _sharedLessonsCache = new Map<string, { value: string | null; ts: number }>();
+const _sharedLessonsInFlight = new Map<string, Promise<void>>();
+const SHARED_LESSONS_TTL_MS = 60_000;
 
 export async function sendBeacon(payload: {
   logs: unknown[];
@@ -104,29 +117,103 @@ export async function sendBeacon(payload: {
 export async function fetchThresholds() {
   if (!swarmBaseUrl()) return { ok: false, error: "SWARM_NOT_CONFIGURED" };
   const url = new URL("/thresholds", swarmBaseUrl()).toString();
-  const key = scoutKey();
   const res = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      ...(key ? { "x-gorover-scout-key": key } : {}),
-    },
+    headers: swarmHeaders(),
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) return { ok: false, status: res.status, error: json?.error || "THRESHOLDS_FAILED" };
   return json;
 }
 
-// Swarm does not currently provide shared lessons/presets endpoints.
-// These functions remain as explicit no-ops for now, so the Rover memory
-// system can evolve locally without network dependencies.
-export function getSharedLessonsForPrompt() {
-  return null;
+export function getSharedLessonsForPrompt({
+  agentType = "GENERAL",
+  maxLessons = 6,
+} = {}) {
+  const role = sanitizeText(agentType, 20) || "GENERAL";
+  const limit = Number.isFinite(Number(maxLessons))
+    ? Math.max(1, Math.min(20, Number(maxLessons)))
+    : 6;
+  const cacheKey = `${role}:${limit}`;
+  const now = Date.now();
+  const cached = _sharedLessonsCache.get(cacheKey);
+  const fresh = cached && now - cached.ts < SHARED_LESSONS_TTL_MS;
+
+  if (!fresh && !_sharedLessonsInFlight.has(cacheKey) && isSwarmEnabled()) {
+    const run = (async () => {
+      const url = new URL("/lessons/shared", swarmBaseUrl());
+      url.searchParams.set("role", role);
+      url.searchParams.set("limit", String(limit));
+      try {
+        const res = await fetch(url.toString(), {
+          headers: swarmHeaders(),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.ok || !Array.isArray(json?.lessons)) {
+          _sharedLessonsCache.set(cacheKey, { value: null, ts: Date.now() });
+          return;
+        }
+        const lines = json.lessons
+          .map((entry) => sanitizeText(entry?.rule, 260))
+          .filter(Boolean)
+          .slice(0, limit);
+        const value = lines.length ? lines.map((line) => `[SHARED] ${line}`).join("\n") : null;
+        _sharedLessonsCache.set(cacheKey, { value, ts: Date.now() });
+      } catch (error) {
+        log("swarm_warn", `Shared lessons fetch failed: ${error?.message || String(error)}`);
+        _sharedLessonsCache.set(cacheKey, { value: null, ts: Date.now() });
+      } finally {
+        _sharedLessonsInFlight.delete(cacheKey);
+      }
+    })();
+    _sharedLessonsInFlight.set(cacheKey, run);
+  }
+  return cached?.value ?? null;
 }
 
-export async function pushSharedLesson() {
-  return null;
+export async function pushSharedLesson(lesson = null) {
+  if (!isSwarmEnabled() || !lesson) return null;
+  const url = new URL("/lessons/shared", swarmBaseUrl()).toString();
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: swarmHeaders(),
+      body: JSON.stringify(lesson),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      log(
+        "swarm_warn",
+        `Shared lesson push failed: HTTP ${res.status}${json?.error ? ` (${sanitizeText(json.error, 120)})` : ""}`
+      );
+      return null;
+    }
+    return { ok: true };
+  } catch (error) {
+    log("swarm_warn", `Shared lesson push error: ${error?.message || String(error)}`);
+    return null;
+  }
 }
 
-export async function pushPerformanceEvent() {
-  return null;
+export async function pushPerformanceEvent(event = null) {
+  if (!isSwarmEnabled() || !event) return null;
+  const url = new URL("/events/performance", swarmBaseUrl()).toString();
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: swarmHeaders(),
+      body: JSON.stringify(event),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      log(
+        "swarm_warn",
+        `Performance event push failed: HTTP ${res.status}${json?.error ? ` (${sanitizeText(json.error, 120)})` : ""}`
+      );
+      return null;
+    }
+    return { ok: true };
+  } catch (error) {
+    log("swarm_warn", `Performance event push error: ${error?.message || String(error)}`);
+    return null;
+  }
 }

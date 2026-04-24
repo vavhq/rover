@@ -19,6 +19,9 @@ const PVP_RIVAL_LIMIT = 2;
 const PVP_MIN_ACTIVE_TVL = 5_000;
 const PVP_MIN_HOLDERS = 500;
 const PVP_MIN_GLOBAL_FEES_SOL = 30;
+const MIN_FINAL_SCORE = Number(process.env.ROVER_MIN_FINAL_SCORE || 50);
+const MAX_RISK_PENALTY = Number(process.env.ROVER_MAX_RISK_PENALTY || 30);
+const MIN_TIMING_SCORE = Number(process.env.ROVER_MIN_TIMING_SCORE || 10);
 
 function normalizeSymbol(symbol) {
   return String(symbol || "")
@@ -32,6 +35,134 @@ function scoreCandidate(pool) {
   const volume = Number(pool.volume_window || 0);
   const holders = Number(pool.holders || 0);
   return feeTvl * 1000 + organic * 10 + volume / 100 + holders / 100;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function scaleLinear(value, inMin, inMax, outMax) {
+  if (!Number.isFinite(value)) return 0;
+  if (inMax <= inMin) return 0;
+  const t = (value - inMin) / (inMax - inMin);
+  return clamp(t, 0, 1) * outMax;
+}
+
+function computeQualityScore(pool) {
+  const feeTvl = Number(pool.fee_active_tvl_ratio || 0);
+  const organic = Number(pool.organic_score || 0);
+  const volume = Number(pool.volume_window || 0);
+  const holders = Number(pool.holders || 0);
+  const smartWalletPresent = (pool.smart_wallet_count || 0) > 0 ? 1 : 0;
+
+  const feeScore = scaleLinear(feeTvl, 0.02, 2.0, 15);
+  const organicScore = scaleLinear(organic, 40, 100, 12);
+  const volumeScore = scaleLinear(volume, 500, 200_000, 10);
+  const holderScore = scaleLinear(holders, 200, 5_000, 8);
+  const smartWalletScore = smartWalletPresent ? 5 : 0;
+
+  const total = clamp(feeScore + organicScore + volumeScore + holderScore + smartWalletScore, 0, 50);
+  return {
+    total: Number(total.toFixed(2)),
+    feeScore: Number(feeScore.toFixed(2)),
+    organicScore: Number(organicScore.toFixed(2)),
+    volumeScore: Number(volumeScore.toFixed(2)),
+    holderScore: Number(holderScore.toFixed(2)),
+    smartWalletScore,
+  };
+}
+
+function computeTimingScore(pool) {
+  const indicatorConfirmed = pool.indicator_confirmation?.confirmed !== false;
+  const indicatorScore = indicatorConfirmed ? 12 : 0;
+
+  const athPct = Number(pool.price_vs_ath_pct);
+  const athScore = Number.isFinite(athPct)
+    ? athPct <= 60
+      ? 8
+      : athPct <= 80
+        ? 5
+        : athPct <= 90
+          ? 2
+          : 0
+    : 4;
+
+  const trend = String(pool.top_cluster_trend || "").toLowerCase();
+  const trendScore = trend === "buy" ? 6 : trend === "neutral" ? 3 : 1;
+
+  const volatility = Number(pool.volatility);
+  const volatilityScore = Number.isFinite(volatility)
+    ? volatility >= 1 && volatility <= 6
+      ? 4
+      : volatility > 6 && volatility <= 10
+        ? 2
+        : 1
+    : 1;
+
+  const total = clamp(indicatorScore + athScore + trendScore + volatilityScore, 0, 30);
+  return {
+    total: Number(total.toFixed(2)),
+    indicatorScore,
+    athScore,
+    trendScore,
+    volatilityScore,
+  };
+}
+
+function computeRiskPenalty(pool) {
+  const rugScore = Number(pool.rugcheck_risk_score);
+  const rugPenalty = Number.isFinite(rugScore) ? clamp((rugScore / 100) * 20, 0, 20) : 3;
+  const ruggedPenalty = pool.rugcheck_rugged ? 20 : 0;
+
+  const top10 = Number(pool.top_holders_pct);
+  const top10Penalty = Number.isFinite(top10) ? clamp((top10 - 40) / 30, 0, 1) * 8 : 0;
+
+  const bots = Number(pool.audit?.bot_holders_pct ?? pool.bot_holders_pct);
+  const botPenalty = Number.isFinite(bots) ? clamp((bots - 10) / 30, 0, 1) * 6 : 0;
+
+  const washPenalty = pool.is_wash ? 6 : 0;
+  const pvpPenalty = pool.is_pvp ? 6 : 0;
+
+  const total = clamp(
+    rugPenalty + ruggedPenalty + top10Penalty + botPenalty + washPenalty + pvpPenalty,
+    0,
+    40
+  );
+  return {
+    total: Number(total.toFixed(2)),
+    rugPenalty: Number(rugPenalty.toFixed(2)),
+    ruggedPenalty,
+    top10Penalty: Number(top10Penalty.toFixed(2)),
+    botPenalty: Number(botPenalty.toFixed(2)),
+    washPenalty,
+    pvpPenalty,
+  };
+}
+
+function interpretFinalScore(score) {
+  if (score >= 85) return "STRONG_DEPLOY";
+  if (score >= 70) return "DEPLOY";
+  if (score >= 60) return "SMALL_SIZE_OR_WATCHLIST";
+  if (score >= 50) return "WATCHLIST";
+  return "NO_DEPLOY";
+}
+
+function computeFinalScoreBreakdown(pool) {
+  const quality = computeQualityScore(pool);
+  const timing = computeTimingScore(pool);
+  const risk = computeRiskPenalty(pool);
+  const raw = quality.total + timing.total - risk.total;
+  const finalScore = clamp(raw, 0, 100);
+  return {
+    finalScore: Number(finalScore.toFixed(2)),
+    qualityScore: quality.total,
+    timingScore: timing.total,
+    riskPenalty: risk.total,
+    quality,
+    timing,
+    risk,
+    interpretation: interpretFinalScore(finalScore),
+  };
 }
 
 async function fetchRugcheckSummary(mint) {
@@ -593,6 +724,58 @@ export async function getTopCandidates({ limit = 10 } = {}) {
     if (eligible.length < before) {
       log("screening", `Indicator confirmation removed ${before - eligible.length} candidate(s)`);
     }
+  }
+
+  // Deterministic composite score + public-facing interpretation.
+  // This makes candidate quality auditable before LLM narrative reasoning.
+  if (eligible.length > 0) {
+    const scored = eligible.map((pool) => {
+      const breakdown = computeFinalScoreBreakdown(pool);
+      return {
+        ...pool,
+        final_score: breakdown.finalScore,
+        quality_score: breakdown.qualityScore,
+        timing_score: breakdown.timingScore,
+        risk_penalty: breakdown.riskPenalty,
+        score_interpretation: breakdown.interpretation,
+        score_breakdown: breakdown,
+      };
+    });
+
+    const filteredByScore = scored.filter((pool) => {
+      if (pool.rugcheck_rugged) {
+        pushFilteredReason(filteredOut, pool, "final gate: rugged token");
+        return false;
+      }
+      if (pool.risk_penalty >= MAX_RISK_PENALTY) {
+        pushFilteredReason(
+          filteredOut,
+          pool,
+          `final gate: risk penalty ${pool.risk_penalty} >= ${MAX_RISK_PENALTY}`
+        );
+        return false;
+      }
+      if (pool.timing_score < MIN_TIMING_SCORE) {
+        pushFilteredReason(
+          filteredOut,
+          pool,
+          `final gate: timing score ${pool.timing_score} < ${MIN_TIMING_SCORE}`
+        );
+        return false;
+      }
+      if (pool.final_score < MIN_FINAL_SCORE) {
+        pushFilteredReason(
+          filteredOut,
+          pool,
+          `final gate: final score ${pool.final_score} < ${MIN_FINAL_SCORE}`
+        );
+        return false;
+      }
+      return true;
+    });
+
+    filteredByScore.sort((a, b) => b.final_score - a.final_score);
+    eligible.splice(0, eligible.length, ...filteredByScore);
   }
 
   return {
