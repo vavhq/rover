@@ -86,9 +86,15 @@ export async function sendBeacon(payload: {
   const json = await res.json().catch(() => null);
   if (!res.ok) {
     const details = json?.error || json?.message || null;
+    const validation =
+      json?.details && typeof json.details === "object"
+        ? JSON.stringify(json.details).slice(0, 500)
+        : null;
     log(
       "swarm_warn",
-      `Beacon rejected: HTTP ${res.status}${details ? ` (${sanitizeText(details, 180)})` : ""}`
+      `Beacon rejected: HTTP ${res.status}${details ? ` (${sanitizeText(details, 180)})` : ""}${
+        validation ? ` details=${validation}` : ""
+      }`
     );
     return { ok: false, status: res.status, error: details || "BEACON_REJECTED", raw: json };
   }

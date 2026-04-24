@@ -59,14 +59,17 @@ ensureAgentId();
 ensureAgentId();
 
 function getRoverVersion(): string {
+  const envVersion = String(process.env.APP_VERSION || process.env.VERSION || "").trim();
+  if (/^\d+\.\d+\.\d+/.test(envVersion)) return envVersion;
   try {
     const pkgUrl = new URL("../../package.json", import.meta.url);
     const pkg = JSON.parse(fs.readFileSync(pkgUrl, "utf8"));
     const v = String(pkg?.version || "").trim();
-    return v || "unknown";
+    if (/^\d+\.\d+\.\d+/.test(v)) return v;
   } catch {
-    return "unknown";
+    // ignore; fallback below
   }
+  return "0.1.0";
 }
 
 function buildBeaconStakesSnapshot() {
@@ -74,28 +77,50 @@ function buildBeaconStakesSnapshot() {
     // Send closed Stakes from last 7 days — rich payload for Swarm AI analysis.
     // More data = better collective intelligence over time.
     const closed = getClosedPositions(7);
-    return closed.slice(-20).map((p: any) => ({
-      pool: p.pool,
-      txHash: p.close_txs?.[0] || "",
-      pnl: typeof p.peak_pnl_pct === "number" ? p.peak_pnl_pct : 0,
-      timestamp: p.closed_at ? new Date(p.closed_at).getTime() : Date.now(),
-      protocol: "meteora" as const,
-      // Future-proof fields for AI analysis
-      minutesHeld:
-        p.deployed_at && p.closed_at
-          ? Math.floor(
-              (new Date(p.closed_at).getTime() - new Date(p.deployed_at).getTime()) / 60000
-            )
-          : undefined,
-      strategy: p.strategy || undefined,
-      exitReason: p.notes?.[p.notes.length - 1] || undefined,
-      outOfRangeMinutes:
-        p.out_of_range_since && p.closed_at
-          ? Math.floor(
-              (new Date(p.closed_at).getTime() - new Date(p.out_of_range_since).getTime()) / 60000
-            )
-          : undefined,
-    }));
+    return closed
+      .slice(-20)
+      .map((p: any) => {
+        const pnlRaw = typeof p.peak_pnl_pct === "number" ? p.peak_pnl_pct : 0;
+        const pnl = Number.isFinite(pnlRaw) ? Math.max(-500, Math.min(500, pnlRaw)) : 0;
+        const tsRaw = p.closed_at ? new Date(p.closed_at).getTime() : Date.now();
+        const timestamp = Number.isFinite(tsRaw) ? Math.floor(tsRaw) : Date.now();
+
+        const minutesHeldRaw =
+          p.deployed_at && p.closed_at
+            ? Math.floor(
+                (new Date(p.closed_at).getTime() - new Date(p.deployed_at).getTime()) / 60000
+              )
+            : undefined;
+        const minutesHeld =
+          typeof minutesHeldRaw === "number" && Number.isFinite(minutesHeldRaw) && minutesHeldRaw >= 0
+            ? minutesHeldRaw
+            : undefined;
+
+        const outOfRangeRaw =
+          p.out_of_range_since && p.closed_at
+            ? Math.floor(
+                (new Date(p.closed_at).getTime() - new Date(p.out_of_range_since).getTime()) / 60000
+              )
+            : undefined;
+        const outOfRangeMinutes =
+          typeof outOfRangeRaw === "number" && Number.isFinite(outOfRangeRaw) && outOfRangeRaw >= 0
+            ? outOfRangeRaw
+            : undefined;
+
+        return {
+          pool: String(p.pool || "").trim(),
+          txHash: String(p.close_txs?.[0] || "").trim(),
+          pnl,
+          timestamp,
+          protocol: "meteora" as const,
+          // Future-proof fields for AI analysis
+          minutesHeld,
+          strategy: p.strategy || undefined,
+          exitReason: p.notes?.[p.notes.length - 1] || undefined,
+          outOfRangeMinutes,
+        };
+      })
+      .filter((s) => !!s.pool && Number.isFinite(s.pnl) && Number.isFinite(s.timestamp));
   } catch {
     return [];
   }
