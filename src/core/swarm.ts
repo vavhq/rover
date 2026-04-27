@@ -65,7 +65,7 @@ export async function sendBeacon(payload: {
     return { ok: false, error: "SWARM_NOT_CONFIGURED" };
   }
 
-  const url = new URL("/beacon", swarmBaseUrl()).toString();
+  const url = new URL("beacon", swarmBaseUrl()).toString();
   const strategyKind = sanitizeText(config.strategyContract?.kind, 20) || "custom";
   const strategyId =
     sanitizeText(config.strategyContract?.id, 120) ||
@@ -116,7 +116,7 @@ export async function sendBeacon(payload: {
 
 export async function fetchThresholds() {
   if (!swarmBaseUrl()) return { ok: false, error: "SWARM_NOT_CONFIGURED" };
-  const url = new URL("/thresholds", swarmBaseUrl()).toString();
+  const url = new URL("thresholds", swarmBaseUrl()).toString();
   const res = await fetch(url, {
     headers: swarmHeaders(),
   });
@@ -140,7 +140,7 @@ export function getSharedLessonsForPrompt({
 
   if (!fresh && !_sharedLessonsInFlight.has(cacheKey) && isSwarmEnabled()) {
     const run = (async () => {
-      const url = new URL("/lessons/shared", swarmBaseUrl());
+      const url = new URL("lessons/shared", swarmBaseUrl());
       url.searchParams.set("role", role);
       url.searchParams.set("limit", String(limit));
       try {
@@ -172,7 +172,7 @@ export function getSharedLessonsForPrompt({
 
 export async function pushSharedLesson(lesson = null) {
   if (!isSwarmEnabled() || !lesson) return null;
-  const url = new URL("/lessons/shared", swarmBaseUrl()).toString();
+  const url = new URL("lessons/shared", swarmBaseUrl()).toString();
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -196,7 +196,7 @@ export async function pushSharedLesson(lesson = null) {
 
 export async function pushPerformanceEvent(event = null) {
   if (!isSwarmEnabled() || !event) return null;
-  const url = new URL("/events/performance", swarmBaseUrl()).toString();
+  const url = new URL("events/performance", swarmBaseUrl()).toString();
   try {
     const res = await fetch(url, {
       method: "POST",
