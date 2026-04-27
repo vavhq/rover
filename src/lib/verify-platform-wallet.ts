@@ -35,7 +35,7 @@ export async function assertWalletMatchesScoutOnSwarm(opts: {
     throw new Error("Swarm base URL missing (goroverSwarmUrl / GOROVER_SWARM_API_BASE).");
   }
 
-  const url = new URL("/scout/registered-wallet", base).toString();
+  const url = new URL("scout/registered-wallet", base).toString();
   const res = await fetch(url, {
     method: "GET",
     headers: {
